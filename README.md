@@ -19,9 +19,9 @@ On first launch, select the `examples` folder or any folder containing `.deck` f
 
 - **New card** or `Space`: randomly draw an unseen card.
 - **Add card** or `Ctrl+N`: append one card to the selected `.deck` file.
-- **Settings** or `Ctrl+,`: choose a different deck folder.
+- **Settings** or `Ctrl+,`: choose a different deck folder and switch between light and dark themes.
 
-Deck saves the selected folder, selected file, and each deck's seen line numbers to `$XDG_DATA_HOME/deck/state.json` (normally `~/.local/share/deck/state.json`). State is written as soon as a card is displayed, so closing the window cannot cause that card to repeat on the next launch.
+Deck saves the selected folder, selected file, theme, and each deck's seen line numbers to `$XDG_DATA_HOME/deck/state.json` (normally `~/.local/share/deck/state.json`). State is written as soon as a card is displayed, so closing the window cannot cause that card to repeat on the next launch.
 
 Blank lines are ignored. Existing cards can be edited with any text editor; editing or reordering existing lines safely starts a fresh round. Appending cards preserves the current round.
 

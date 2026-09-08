@@ -32,7 +32,13 @@ class StateStore:
     def __init__(self, data_dir: Path | None = None) -> None:
         self.data_dir = Path(data_dir) if data_dir else default_data_dir()
         self.path = self.data_dir / "state.json"
-        self.data: dict[str, Any] = {"version": 1, "folder": "", "active_file": "", "decks": {}}
+        self.data: dict[str, Any] = {
+            "version": 1,
+            "folder": "",
+            "active_file": "",
+            "theme": "light",
+            "decks": {},
+        }
         self._load()
 
     def _load(self) -> None:
@@ -71,9 +77,21 @@ class StateStore:
     def active_file(self) -> str:
         return str(self.data.get("active_file", ""))
 
+    @property
+    def theme(self) -> str:
+        value = self.data.get("theme", "light")
+        return value if value in ("light", "dark") else "light"
+
     def set_selection(self, folder: Path, active_file: str = "") -> None:
         self.data["folder"] = str(folder.resolve())
         self.data["active_file"] = active_file
+        self.save()
+
+    def set_preferences(self, folder: Path | None, theme: str) -> None:
+        if theme not in ("light", "dark"):
+            raise ValueError(f"Unsupported theme: {theme}")
+        self.data["folder"] = str(folder.resolve()) if folder else ""
+        self.data["theme"] = theme
         self.save()
 
     @staticmethod

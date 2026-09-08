@@ -62,6 +62,16 @@ class StateStoreTests(unittest.TestCase):
             ["deck.deck", "SECOND.DECK"],
         )
 
+    def test_theme_preference_survives_reload(self):
+        self.store.set_preferences(self.root, "dark")
+        reloaded = StateStore(self.root / "data")
+        self.assertEqual(reloaded.theme, "dark")
+        self.assertEqual(reloaded.folder, self.root)
+
+    def test_invalid_saved_theme_falls_back_to_light(self):
+        self.store.data["theme"] = "sepia"
+        self.assertEqual(self.store.theme, "light")
+
 
 if __name__ == "__main__":
     unittest.main()
