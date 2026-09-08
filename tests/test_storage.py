@@ -10,7 +10,7 @@ class StateStoreTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.deck = self.root / "deck.txt"
+        self.deck = self.root / "deck.deck"
         self.deck.write_text("alpha\nbeta\ngamma\n", encoding="utf-8")
         self.store = StateStore(self.root / "data")
 
@@ -53,6 +53,14 @@ class StateStoreTests(unittest.TestCase):
     def test_utf8_bom_and_blank_lines(self):
         self.deck.write_text("\ufeffone\n\n two \n", encoding="utf-8")
         self.assertEqual(self.store.read_cards(self.deck), ["one", " two "])
+
+    def test_only_deck_files_are_discovered(self):
+        (self.root / "notes.txt").write_text("not a deck\n", encoding="utf-8")
+        (self.root / "SECOND.DECK").write_text("a card\n", encoding="utf-8")
+        self.assertEqual(
+            [path.name for path in self.store.list_decks(self.root)],
+            ["deck.deck", "SECOND.DECK"],
+        )
 
 
 if __name__ == "__main__":

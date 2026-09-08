@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Deck
-Comment=Draw unseen cards at random from text files
+Comment=Draw unseen cards at random from .deck files
 Exec=deck
 Icon=applications-games
 Terminal=false

@@ -1,6 +1,6 @@
 # Deck
 
-Deck is a small Fedora/KDE desktop app that draws cards at random from plain-text files. Every non-empty line is one card. A card is never repeated until every card in that file has appeared; then Deck automatically starts a fresh randomized round.
+Deck is a small Fedora/KDE desktop app that draws cards at random from `.deck` files. A `.deck` file is UTF-8 plain text, and every non-empty line is one card. A card is never repeated until every card in that file has appeared; then Deck automatically starts a fresh randomized round.
 
 ## Run it
 
@@ -13,12 +13,12 @@ pip install -r requirements.txt
 python -m deck_app
 ```
 
-On first launch, select the `examples` folder or any folder containing `.txt` files. If a folder contains several text files, choose the active deck from the footer list.
+On first launch, select the `examples` folder or any folder containing `.deck` files. If a folder contains several deck files, choose the active deck from the footer list.
 
 ## Controls
 
 - **New card** or `Space`: randomly draw an unseen card.
-- **Add card** or `Ctrl+N`: append one card to the selected text file.
+- **Add card** or `Ctrl+N`: append one card to the selected `.deck` file.
 - **Settings** or `Ctrl+,`: choose a different deck folder.
 
 Deck saves the selected folder, selected file, and each deck's seen line numbers to `$XDG_DATA_HOME/deck/state.json` (normally `~/.local/share/deck/state.json`). State is written as soon as a card is displayed, so closing the window cannot cause that card to repeat on the next launch.

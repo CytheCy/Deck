@@ -129,10 +129,10 @@ class DeckWindow(QMainWindow):
         self.settings_button = self._tool_button("bx-cog", "Settings", "Choose the deck folder (Ctrl+,)")
         self.settings_button.clicked.connect(self.choose_folder)
         self.deck_combo = QComboBox()
-        self.deck_combo.setToolTip("Choose a text-file deck")
+        self.deck_combo.setToolTip("Choose a .deck file")
         self.deck_combo.setMinimumWidth(180)
         self.deck_combo.currentIndexChanged.connect(self._deck_changed)
-        self.add_button = self._tool_button("bx-plus", "Add card", "Add a card to this text file (Ctrl+N)")
+        self.add_button = self._tool_button("bx-plus", "Add card", "Add a card to this deck (Ctrl+N)")
         self.add_button.clicked.connect(self.add_card)
         self.next_button = self._tool_button("bx-shuffle", "New card", "Draw a random unseen card (Space)")
         self.next_button.setObjectName("primaryTool")
@@ -198,8 +198,8 @@ class DeckWindow(QMainWindow):
         else:
             self.current_path = None
             self.cards = []
-            self.deck_combo.setPlaceholderText("No .txt decks found")
-            self.card_text.setText("Choose a folder with a .txt file to begin")
+            self.deck_combo.setPlaceholderText("No .deck files found")
+            self.card_text.setText("Choose a folder with a .deck file to begin")
             self.deck_label.setText("NO DECK SELECTED")
             self.progress_label.clear()
             self._update_controls()

@@ -87,7 +87,7 @@ class StateStore:
         if not folder or not folder.is_dir():
             return []
         return sorted(
-            (path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".txt"),
+            (path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".deck"),
             key=lambda path: path.name.casefold(),
         )
 
