@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "random-deck"
+version = "1.0.0"
+description = "A persistent random card viewer for text-file decks"
+requires-python = ">=3.10"
+dependencies = ["PySide6>=6.7,<7"]
+
+[project.gui-scripts]
+deck = "deck_app.app:main"
+
+[tool.setuptools]
+packages = ["deck_app"]
+
+[tool.setuptools.data-files]
+"share/deck/assets/icons" = ["assets/icons/*.svg", "assets/icons/LICENSE"]

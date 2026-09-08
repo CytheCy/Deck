@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Deck
+Comment=Draw unseen cards at random from text files
+Exec=deck
+Icon=applications-games
+Terminal=false
+Categories=Utility;Education;
+StartupWMClass=io.github.deck.Deck
