@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from deck_app.storage import StateStore, append_card
+from deck_app.storage import StateStore, append_card, replace_card
 
 
 class StateStoreTests(unittest.TestCase):
@@ -49,6 +49,20 @@ class StateStoreTests(unittest.TestCase):
         edited = ["changed", "beta", "gamma"]
         self.store.draw(self.deck, edited, random.Random(1))
         self.assertEqual(self.store.progress(self.deck, 3), (1, 3))
+
+    def test_replacing_card_preserves_layout_and_seen_history(self):
+        self.deck.write_text("alpha\r\n\r\nbeta\r\n", encoding="utf-8")
+        cards = self.store.read_cards(self.deck)
+        first = self.store.draw(self.deck, cards, random.Random(1))
+        replacement = replace_card(self.deck, first.index, " updated card ", expected=first.text)
+        edited_cards = self.store.read_cards(self.deck)
+        self.store.record_edit(self.deck, edited_cards, first.index)
+
+        self.assertEqual(replacement, "updated card")
+        self.assertEqual(self.deck.read_bytes().count(b"\r\n"), 3)
+        self.assertIn(b"\r\n\r\n", self.deck.read_bytes())
+        self.assertEqual(self.store.progress(self.deck, 2), (1, 2))
+        self.assertEqual(edited_cards[first.index], "updated card")
 
     def test_utf8_bom_and_blank_lines(self):
         self.deck.write_text("\ufeffone\n\n two \n", encoding="utf-8")

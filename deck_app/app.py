@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .storage import StateStore, append_card
+from .storage import StateStore, append_card, replace_card
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,6 +51,34 @@ class AddCardDialog(QDialog):
         hint.setObjectName("muted")
         self.editor = QPlainTextEdit()
         self.editor.setPlaceholderText("Type the card text…")
+        self.editor.setMinimumHeight(140)
+        buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
+        buttons.accepted.connect(self._accept_if_valid)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(title)
+        layout.addWidget(hint)
+        layout.addSpacing(8)
+        layout.addWidget(self.editor)
+        layout.addWidget(buttons)
+
+    def _accept_if_valid(self) -> None:
+        if self.editor.toPlainText().strip():
+            self.accept()
+
+
+class EditCardDialog(QDialog):
+    def __init__(self, card_text: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Edit card")
+        self.setMinimumWidth(430)
+        layout = QVBoxLayout(self)
+        title = QLabel("Edit card")
+        title.setObjectName("dialogTitle")
+        hint = QLabel("Update the card currently in view.")
+        hint.setObjectName("muted")
+        self.editor = QPlainTextEdit()
+        self.editor.setPlainText(card_text)
+        self.editor.selectAll()
         self.editor.setMinimumHeight(140)
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
         buttons.accepted.connect(self._accept_if_valid)
@@ -128,6 +156,7 @@ class DeckWindow(QMainWindow):
         self.store = StateStore()
         self.current_path: Path | None = None
         self.cards: list[str] = []
+        self.current_card_index: int | None = None
         self.setWindowTitle("Deck")
         self.setMinimumSize(620, 500)
         self.resize(820, 650)
@@ -200,19 +229,28 @@ class DeckWindow(QMainWindow):
         self.deck_combo.currentIndexChanged.connect(self._deck_changed)
         self.add_button = self._tool_button("bx-plus", "Add card", "Add a card to this deck (Ctrl+N)")
         self.add_button.clicked.connect(self.add_card)
-        self.next_button = self._tool_button("bx-shuffle", "New card", "Draw a random unseen card (Space)")
+        self.edit_button = self._tool_button("bx-edit", "Edit", "Edit the card in view (Ctrl+E)")
+        self.edit_button.clicked.connect(self.edit_card)
+        self.next_button = self._tool_button("bx-shuffle", "Next", "Draw a random unseen card (Space)")
         self.next_button.setObjectName("primaryTool")
         self.next_button.setIcon(self._icon("bx-shuffle", "#ffffff"))
         self.next_button.clicked.connect(self.draw_card)
         footer_layout.addWidget(self.settings_button)
         footer_layout.addWidget(self.deck_combo, 1)
         footer_layout.addWidget(self.add_button)
+        footer_layout.addWidget(self.edit_button)
         footer_layout.addWidget(self.next_button)
         outer.addWidget(footer)
         self.setCentralWidget(central)
 
     def _build_shortcuts(self) -> None:
-        for shortcut, callback in ((QKeySequence("Space"), self.draw_card), (QKeySequence("Ctrl+N"), self.add_card), (QKeySequence("Ctrl+,"), self.open_settings)):
+        shortcuts = (
+            (QKeySequence("Space"), self.draw_card),
+            (QKeySequence("Ctrl+N"), self.add_card),
+            (QKeySequence("Ctrl+E"), self.edit_card),
+            (QKeySequence("Ctrl+,"), self.open_settings),
+        )
+        for shortcut, callback in shortcuts:
             action = QAction(self)
             action.setShortcut(shortcut)
             action.triggered.connect(callback)
@@ -269,6 +307,7 @@ class DeckWindow(QMainWindow):
     def _refresh_icons(self) -> None:
         self.settings_button.setIcon(self._icon("bx-cog"))
         self.add_button.setIcon(self._icon("bx-plus"))
+        self.edit_button.setIcon(self._icon("bx-edit"))
         self.next_button.setIcon(self._icon("bx-shuffle", "#ffffff"))
 
     def refresh_decks(self, initial: bool = False, preferred: str = "") -> None:
@@ -287,6 +326,7 @@ class DeckWindow(QMainWindow):
         else:
             self.current_path = None
             self.cards = []
+            self.current_card_index = None
             self.deck_combo.setPlaceholderText("No .deck files found")
             self.card_text.setText("Choose a folder with a .deck file to begin")
             self.deck_label.setText("NO DECK SELECTED")
@@ -304,6 +344,7 @@ class DeckWindow(QMainWindow):
             QMessageBox.critical(self, "Could not open deck", f"{path.name} could not be read.\n\n{error}")
             return
         self.current_path, self.cards = path, cards
+        self.current_card_index = None
         self.store.set_selection(path.parent, path.name)
         self.deck_label.setText(path.stem.upper())
         self._update_controls()
@@ -315,6 +356,7 @@ class DeckWindow(QMainWindow):
 
     def _update_controls(self) -> None:
         self.add_button.setEnabled(self.current_path is not None)
+        self.edit_button.setEnabled(self.current_card_index is not None)
         self.next_button.setEnabled(bool(self.cards))
         self.deck_combo.setEnabled(self.deck_combo.count() > 0)
 
@@ -322,10 +364,12 @@ class DeckWindow(QMainWindow):
         if not self.current_path or not self.cards:
             return
         draw = self.store.draw(self.current_path, self.cards)
+        self.current_card_index = draw.index
         self.card_text.setText(draw.text)
         seen, total = self.store.progress(self.current_path, len(self.cards))
         prefix = "New round · " if draw.cycle_started else ""
         self.progress_label.setText(f"{prefix}{seen} of {total} seen")
+        self._update_controls()
         self._animate_card()
 
     def _animate_card(self) -> None:
@@ -350,12 +394,35 @@ class DeckWindow(QMainWindow):
         try:
             append_card(self.current_path, dialog.editor.toPlainText())
             self.cards = self.store.read_cards(self.current_path)
+            self.current_card_index = None
             self._update_controls()
             self.card_text.setText("Card added to the deck")
             seen, total = self.store.progress(self.current_path, len(self.cards))
             self.progress_label.setText(f"{seen} of {total} seen")
         except OSError as error:
             QMessageBox.critical(self, "Could not add card", f"The card could not be saved.\n\n{error}")
+
+    def edit_card(self) -> None:
+        if self.current_path is None or self.current_card_index is None:
+            return
+        index = self.current_card_index
+        dialog = EditCardDialog(self.cards[index], self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        try:
+            edited_text = replace_card(
+                self.current_path,
+                index,
+                dialog.editor.toPlainText(),
+                expected=self.cards[index],
+            )
+            self.cards = self.store.read_cards(self.current_path)
+            self.store.record_edit(self.current_path, self.cards, index)
+            self.card_text.setText(edited_text)
+            seen, total = self.store.progress(self.current_path, len(self.cards))
+            self.progress_label.setText(f"{seen} of {total} seen")
+        except (OSError, UnicodeError, ValueError, IndexError) as error:
+            QMessageBox.critical(self, "Could not edit card", f"The card could not be saved.\n\n{error}")
 
 
 def main() -> int:

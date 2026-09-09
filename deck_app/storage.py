@@ -144,6 +144,33 @@ class StateStore:
         valid = {index for index in seen if isinstance(index, int) and 0 <= index < total}
         return len(valid), total
 
+    def record_edit(self, path: Path, cards: Sequence[str], edited_index: int) -> None:
+        """Update a deck snapshot while retaining valid draw history."""
+        key = str(path.resolve())
+        record = self.data["decks"].get(key, {})
+        old_cards = record.get("cards", [])
+        seen = record.get("seen", [])
+        only_selected_card_changed = (
+            isinstance(old_cards, list)
+            and len(old_cards) == len(cards)
+            and all(
+                old == new
+                for index, (old, new) in enumerate(zip(old_cards, cards))
+                if index != edited_index
+            )
+        )
+        if only_selected_card_changed and isinstance(seen, list):
+            seen_set = {
+                index
+                for index in seen
+                if isinstance(index, int) and 0 <= index < len(cards)
+            }
+        else:
+            seen_set = set()
+        seen_set.add(edited_index)
+        self.data["decks"][key] = {"cards": list(cards), "seen": sorted(seen_set)}
+        self.save()
+
 
 def append_card(path: Path, text: str) -> None:
     clean = " ".join(part.strip() for part in text.splitlines() if part.strip())
@@ -158,3 +185,32 @@ def append_card(path: Path, text: str) -> None:
         if needs_newline:
             handle.write("\n")
         handle.write(clean + "\n")
+
+
+def replace_card(path: Path, index: int, text: str, expected: str | None = None) -> str:
+    """Replace one nonblank card line while preserving the file's other lines."""
+    clean = " ".join(part.strip() for part in text.splitlines() if part.strip())
+    if not clean:
+        raise ValueError("Card text cannot be empty")
+
+    has_bom = path.read_bytes().startswith(b"\xef\xbb\xbf")
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        raw = handle.read()
+    lines = raw.splitlines(keepends=True)
+    card_lines = [
+        line_index
+        for line_index, line in enumerate(lines)
+        if line.rstrip("\r\n").strip()
+    ]
+    if not 0 <= index < len(card_lines):
+        raise IndexError("Card is no longer present in the deck")
+
+    line_index = card_lines[index]
+    old_text = lines[line_index].rstrip("\r\n")
+    if expected is not None and old_text != expected:
+        raise ValueError("The deck changed since this card was drawn")
+    ending = lines[line_index][len(old_text):]
+    lines[line_index] = clean + ending
+    with path.open("w", encoding="utf-8-sig" if has_bom else "utf-8", newline="") as handle:
+        handle.write("".join(lines))
+    return clean
