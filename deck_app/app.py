@@ -37,6 +37,18 @@ ICON_DIR = next(
     ) if candidate.is_dir()),
     ROOT / "assets" / "icons",
 )
+APP_ICON = next(
+    (
+        candidate
+        for candidate in (
+            ROOT / "assets" / "io.github.deck.Deck.svg",
+            ROOT / "share" / "icons" / "hicolor" / "scalable" / "apps" / "io.github.deck.Deck.svg",
+            Path(sys.prefix) / "share" / "icons" / "hicolor" / "scalable" / "apps" / "io.github.deck.Deck.svg",
+        )
+        if candidate.is_file()
+    ),
+    ROOT / "assets" / "io.github.deck.Deck.svg",
+)
 
 
 class AddCardDialog(QDialog):
@@ -158,6 +170,7 @@ class DeckWindow(QMainWindow):
         self.cards: list[str] = []
         self.current_card_index: int | None = None
         self.setWindowTitle("Deck")
+        self.setWindowIcon(QIcon(str(APP_ICON)))
         self.setMinimumSize(620, 500)
         self.resize(820, 650)
         self._build_ui()
@@ -487,6 +500,7 @@ def main(arguments: list[str] | None = None) -> int:
     app.setApplicationName("Deck")
     app.setOrganizationName("Deck")
     app.setDesktopFileName("io.github.deck.Deck")
+    app.setWindowIcon(QIcon(str(APP_ICON)))
     window = DeckWindow(app.pending_open_path or requested_path)
     app.window = window
     window.show()

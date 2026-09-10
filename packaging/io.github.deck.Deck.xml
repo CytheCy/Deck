@@ -2,6 +2,7 @@
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/x-deck">
     <comment>Deck card file</comment>
+    <icon name="io.github.deck.Deck"/>
     <glob pattern="*.deck"/>
     <glob pattern="*.DECK"/>
   </mime-type>

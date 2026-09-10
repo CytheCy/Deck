@@ -33,7 +33,9 @@ After activating the virtual environment, install the package and desktop entry:
 ```bash
 pip install .
 install -Dm644 packaging/io.github.deck.Deck.desktop "$HOME/.local/share/applications/io.github.deck.Deck.desktop"
+install -Dm644 assets/io.github.deck.Deck.svg "$HOME/.local/share/icons/hicolor/scalable/apps/io.github.deck.Deck.svg"
 install -Dm644 packaging/io.github.deck.Deck.xml "$HOME/.local/share/mime/packages/io.github.deck.Deck.xml"
+gtk-update-icon-cache "$HOME/.local/share/icons/hicolor"
 update-mime-database "$HOME/.local/share/mime"
 update-desktop-database "$HOME/.local/share/applications"
 ```
