@@ -2,8 +2,9 @@
 Type=Application
 Name=Deck
 Comment=Draw unseen cards at random from .deck files
-Exec=deck
+Exec=deck %f
 Icon=applications-games
 Terminal=false
 Categories=Utility;Education;
 StartupWMClass=io.github.deck.Deck
+MimeType=application/x-deck;

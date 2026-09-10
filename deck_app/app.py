@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPainter
+from PySide6.QtCore import QEvent, QEasingCurve, QPropertyAnimation, QSize, Qt
+from PySide6.QtGui import QAction, QColor, QFileOpenEvent, QFont, QIcon, QKeySequence, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -151,7 +151,7 @@ class SettingsDialog(QDialog):
 
 
 class DeckWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, opened_path: Path | None = None) -> None:
         super().__init__()
         self.store = StateStore()
         self.current_path: Path | None = None
@@ -163,7 +163,10 @@ class DeckWindow(QMainWindow):
         self._build_ui()
         self._build_shortcuts()
         self._apply_style()
-        self.refresh_decks(initial=True)
+        if opened_path is None:
+            self.refresh_decks(initial=True)
+        elif not self.open_external_deck(opened_path):
+            self.refresh_decks(initial=True)
 
     def _icon(self, name: str, color: str | None = None) -> QIcon:
         source = QIcon(str(ICON_DIR / f"{name}.svg"))
@@ -231,7 +234,9 @@ class DeckWindow(QMainWindow):
         self.add_button.clicked.connect(self.add_card)
         self.edit_button = self._tool_button("bx-edit", "Edit", "Edit the card in view (Ctrl+E)")
         self.edit_button.clicked.connect(self.edit_card)
-        self.next_button = self._tool_button("bx-shuffle", "Next", "Draw a random unseen card (Space)")
+        self.next_button = self._tool_button(
+            "bx-shuffle", "Next", "Draw a random unseen card (Space or Right Arrow)"
+        )
         self.next_button.setObjectName("primaryTool")
         self.next_button.setIcon(self._icon("bx-shuffle", "#ffffff"))
         self.next_button.clicked.connect(self.draw_card)
@@ -246,6 +251,7 @@ class DeckWindow(QMainWindow):
     def _build_shortcuts(self) -> None:
         shortcuts = (
             (QKeySequence("Space"), self.draw_card),
+            (QKeySequence(Qt.Key_Right), self.draw_card),
             (QKeySequence("Ctrl+N"), self.add_card),
             (QKeySequence("Ctrl+E"), self.edit_card),
             (QKeySequence("Ctrl+,"), self.open_settings),
@@ -337,15 +343,37 @@ class DeckWindow(QMainWindow):
         if index >= 0:
             self._load_deck(Path(self.deck_combo.itemData(index)), draw=True)
 
-    def _load_deck(self, path: Path, draw: bool) -> None:
+    def open_external_deck(self, path: Path) -> bool:
+        """Open a deck for this session without changing the configured folder."""
+        path = path.expanduser().resolve()
+        if path.suffix.lower() != ".deck" or not path.is_file():
+            QMessageBox.critical(
+                self,
+                "Could not open deck",
+                f"{path} is not a .deck file.",
+            )
+            return False
+
+        if not self._load_deck(path, draw=True, remember=False):
+            return False
+        self.deck_combo.blockSignals(True)
+        self.deck_combo.clear()
+        self.deck_combo.addItem(path.stem, str(path))
+        self.deck_combo.setCurrentIndex(0)
+        self.deck_combo.blockSignals(False)
+        self._update_controls()
+        return True
+
+    def _load_deck(self, path: Path, draw: bool, remember: bool = True) -> bool:
         try:
             cards = self.store.read_cards(path)
         except (OSError, UnicodeError) as error:
             QMessageBox.critical(self, "Could not open deck", f"{path.name} could not be read.\n\n{error}")
-            return
+            return False
         self.current_path, self.cards = path, cards
         self.current_card_index = None
-        self.store.set_selection(path.parent, path.name)
+        if remember:
+            self.store.set_selection(path.parent, path.name)
         self.deck_label.setText(path.stem.upper())
         self._update_controls()
         if not cards:
@@ -353,6 +381,7 @@ class DeckWindow(QMainWindow):
             self.progress_label.setText("0 cards")
         elif draw:
             self.draw_card()
+        return True
 
     def _update_controls(self) -> None:
         self.add_button.setEnabled(self.current_path is not None)
@@ -425,12 +454,41 @@ class DeckWindow(QMainWindow):
             QMessageBox.critical(self, "Could not edit card", f"The card could not be saved.\n\n{error}")
 
 
-def main() -> int:
-    app = QApplication(sys.argv)
+class DeckApplication(QApplication):
+    """Receive file-manager open events on platforms that reuse an app process."""
+
+    def __init__(self, arguments: list[str]) -> None:
+        super().__init__(arguments)
+        self.window: DeckWindow | None = None
+        if not hasattr(self, "pending_open_path"):
+            self.pending_open_path: Path | None = None
+
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.FileOpen and isinstance(event, QFileOpenEvent):
+            path = Path(event.file())
+            if getattr(self, "window", None) is None:
+                self.pending_open_path = path
+            else:
+                self.window.open_external_deck(path)
+                self.window.show()
+                self.window.raise_()
+                self.window.activateWindow()
+            return True
+        return super().event(event)
+
+
+def main(arguments: list[str] | None = None) -> int:
+    arguments = list(sys.argv if arguments is None else arguments)
+    requested_path = next(
+        (Path(argument) for argument in arguments[1:] if not argument.startswith("-")),
+        None,
+    )
+    app = DeckApplication(arguments)
     app.setApplicationName("Deck")
     app.setOrganizationName("Deck")
     app.setDesktopFileName("io.github.deck.Deck")
-    window = DeckWindow()
+    window = DeckWindow(app.pending_open_path or requested_path)
+    app.window = window
     window.show()
     return app.exec()
 

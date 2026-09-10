@@ -17,3 +17,5 @@ packages = ["deck_app"]
 
 [tool.setuptools.data-files]
 "share/deck/assets/icons" = ["assets/icons/*.svg", "assets/icons/LICENSE"]
+"share/applications" = ["packaging/io.github.deck.Deck.desktop"]
+"share/mime/packages" = ["packaging/io.github.deck.Deck.xml"]
