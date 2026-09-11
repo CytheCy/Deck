@@ -8,9 +8,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 
-from deck_app.app import DeckWindow
+from deck_app.app import CardListDialog, DeckWindow
 from deck_app.storage import StateStore
 
 
@@ -62,6 +62,32 @@ class ExternalOpenTests(unittest.TestCase):
 
                 self.assertEqual(window.store.progress(deck, 2), (2, 2))
                 window.close()
+
+    def test_card_list_search_filters_case_insensitively(self):
+        dialog = CardListDialog(
+            "prompts",
+            ["Write a headline", "Sketch a landscape", "Rewrite the ending"],
+        )
+
+        self.assertEqual(dialog.card_list.count(), 3)
+        dialog.search_edit.setText("HEADLINE")
+        self.app.processEvents()
+
+        self.assertEqual(dialog.card_list.count(), 1)
+        self.assertEqual(dialog.card_list.item(0).text(), "Write a headline")
+        self.assertEqual(dialog.card_list.item(0).data(Qt.UserRole), 0)
+        self.assertEqual(dialog.result_label.text(), "1 matching card · 3 total")
+        dialog.close()
+
+    def test_activating_list_item_returns_original_card_index(self):
+        dialog = CardListDialog("prompts", ["alpha", "beta", "gamma"])
+        dialog.search_edit.setText("gamma")
+        item = dialog.card_list.item(0)
+
+        dialog._select_card(item)
+
+        self.assertEqual(dialog.selected_card_index, 2)
+        self.assertEqual(dialog.result(), QDialog.Accepted)
 
 
 if __name__ == "__main__":

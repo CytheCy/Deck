@@ -19,6 +19,7 @@ On first launch, select the `examples` folder or any folder containing `.deck` f
 
 - **Next**, `Space`, or `Right Arrow`: randomly draw an unseen card.
 - **Add card** or `Ctrl+N`: append one card to the selected `.deck` file.
+- **Show List** or `Ctrl+L`: browse and search all cards; activate one to show it.
 - **Edit** or `Ctrl+E`: update the card currently in view.
 - **Settings** or `Ctrl+,`: choose a different deck folder and switch between light and dark themes.
 

@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -104,6 +106,86 @@ class EditCardDialog(QDialog):
     def _accept_if_valid(self) -> None:
         if self.editor.toPlainText().strip():
             self.accept()
+
+
+class CardListDialog(QDialog):
+    def __init__(
+        self,
+        deck_name: str,
+        cards: list[str],
+        current_index: int | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.cards = cards
+        self.selected_card_index: int | None = None
+        self.setWindowTitle(f"{deck_name} — Card list")
+        self.setMinimumSize(500, 440)
+        self.resize(620, 540)
+
+        layout = QVBoxLayout(self)
+        title = QLabel(f"Cards in {deck_name}")
+        title.setObjectName("dialogTitle")
+        self.search_edit = QLineEdit()
+        self.search_edit.setObjectName("cardSearch")
+        self.search_edit.setPlaceholderText("Search cards…")
+        self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.setAccessibleName("Search cards")
+        self.search_edit.textChanged.connect(self._filter_cards)
+
+        self.card_list = QListWidget()
+        self.card_list.setObjectName("cardList")
+        self.card_list.setAlternatingRowColors(True)
+        self.card_list.itemActivated.connect(self._select_card)
+        self.result_label = QLabel()
+        self.result_label.setObjectName("muted")
+
+        close_button = QDialogButtonBox(QDialogButtonBox.Close)
+        close_button.rejected.connect(self.reject)
+        layout.addWidget(title)
+        layout.addWidget(self.search_edit)
+        layout.addWidget(self.card_list, 1)
+        layout.addWidget(self.result_label)
+        layout.addWidget(close_button)
+
+        self._filter_cards("")
+        if current_index is not None:
+            for row in range(self.card_list.count()):
+                item = self.card_list.item(row)
+                if item.data(Qt.UserRole) == current_index:
+                    self.card_list.setCurrentItem(item)
+                    self.card_list.scrollToItem(item)
+                    break
+        self.search_edit.setFocus()
+
+    def _filter_cards(self, query: str) -> None:
+        selected_index = None
+        current_item = self.card_list.currentItem()
+        if current_item is not None:
+            selected_index = current_item.data(Qt.UserRole)
+
+        self.card_list.clear()
+        needle = query.strip().casefold()
+        for index, card in enumerate(self.cards):
+            if needle and needle not in card.casefold():
+                continue
+            item = QListWidgetItem(card)
+            item.setData(Qt.UserRole, index)
+            item.setToolTip(card)
+            self.card_list.addItem(item)
+            if index == selected_index:
+                self.card_list.setCurrentItem(item)
+
+        visible = self.card_list.count()
+        noun = "card" if visible == 1 else "cards"
+        if needle:
+            self.result_label.setText(f"{visible} matching {noun} · {len(self.cards)} total")
+        else:
+            self.result_label.setText(f"{visible} {noun}")
+
+    def _select_card(self, item: QListWidgetItem) -> None:
+        self.selected_card_index = int(item.data(Qt.UserRole))
+        self.accept()
 
 
 class SettingsDialog(QDialog):
@@ -245,6 +327,8 @@ class DeckWindow(QMainWindow):
         self.deck_combo.currentIndexChanged.connect(self._deck_changed)
         self.add_button = self._tool_button("bx-plus", "Add card", "Add a card to this deck (Ctrl+N)")
         self.add_button.clicked.connect(self.add_card)
+        self.list_button = self._tool_button("bx-list-ul", "Show List", "Browse and search every card (Ctrl+L)")
+        self.list_button.clicked.connect(self.show_card_list)
         self.edit_button = self._tool_button("bx-edit", "Edit", "Edit the card in view (Ctrl+E)")
         self.edit_button.clicked.connect(self.edit_card)
         self.next_button = self._tool_button(
@@ -256,6 +340,7 @@ class DeckWindow(QMainWindow):
         footer_layout.addWidget(self.settings_button)
         footer_layout.addWidget(self.deck_combo, 1)
         footer_layout.addWidget(self.add_button)
+        footer_layout.addWidget(self.list_button)
         footer_layout.addWidget(self.edit_button)
         footer_layout.addWidget(self.next_button)
         outer.addWidget(footer)
@@ -266,6 +351,7 @@ class DeckWindow(QMainWindow):
             (QKeySequence("Space"), self.draw_card),
             (QKeySequence(Qt.Key_Right), self.draw_card),
             (QKeySequence("Ctrl+N"), self.add_card),
+            (QKeySequence("Ctrl+L"), self.show_card_list),
             (QKeySequence("Ctrl+E"), self.edit_card),
             (QKeySequence("Ctrl+,"), self.open_settings),
         )
@@ -307,6 +393,12 @@ class DeckWindow(QMainWindow):
             QComboBox, QLineEdit { background: %(field)s; border: 1px solid %(border)s; border-radius: 9px; padding: 9px 12px; color: %(text)s; }
             QComboBox:hover, QComboBox:focus { border-color: #8b5cf6; }
             QComboBox QAbstractItemView { background: %(surface)s; selection-background-color: %(menu_selection)s; color: %(text)s; }
+            QListWidget#cardList { background: %(surface)s; alternate-background-color: %(field)s; border: 1px solid %(border)s; border-radius: 9px; padding: 5px; color: %(text)s; outline: none; }
+            QListWidget#cardList::item { border-radius: 6px; padding: 10px 12px; }
+            QListWidget#cardList::item:alternate { background: %(field)s; }
+            QListWidget#cardList::item:selected { background: %(menu_selection)s; color: %(text)s; }
+            QListWidget#cardList::item:hover { background: %(hover)s; }
+            QLineEdit#cardSearch:focus { border-color: #8b5cf6; }
             QPlainTextEdit { background: %(surface)s; border: 1px solid %(border)s; border-radius: 9px; padding: 10px; font-size: 14px; color: %(text)s; }
             QPlainTextEdit:focus { border-color: #8b5cf6; }
             QPushButton { background: %(field)s; border: 1px solid %(border)s; padding: 8px 16px; border-radius: 7px; color: %(text)s; }
@@ -326,6 +418,7 @@ class DeckWindow(QMainWindow):
     def _refresh_icons(self) -> None:
         self.settings_button.setIcon(self._icon("bx-cog"))
         self.add_button.setIcon(self._icon("bx-plus"))
+        self.list_button.setIcon(self._icon("bx-list-ul"))
         self.edit_button.setIcon(self._icon("bx-edit"))
         self.next_button.setIcon(self._icon("bx-shuffle", "#ffffff"))
 
@@ -398,6 +491,7 @@ class DeckWindow(QMainWindow):
 
     def _update_controls(self) -> None:
         self.add_button.setEnabled(self.current_path is not None)
+        self.list_button.setEnabled(bool(self.cards))
         self.edit_button.setEnabled(self.current_card_index is not None)
         self.next_button.setEnabled(bool(self.cards))
         self.deck_combo.setEnabled(self.deck_combo.count() > 0)
@@ -413,6 +507,21 @@ class DeckWindow(QMainWindow):
         self.progress_label.setText(f"{prefix}{seen} of {total} seen")
         self._update_controls()
         self._animate_card()
+
+    def show_card_list(self) -> None:
+        if not self.current_path or not self.cards:
+            return
+        dialog = CardListDialog(
+            self.current_path.stem,
+            self.cards,
+            self.current_card_index,
+            self,
+        )
+        if dialog.exec() == QDialog.Accepted and dialog.selected_card_index is not None:
+            self.current_card_index = dialog.selected_card_index
+            self.card_text.setText(self.cards[self.current_card_index])
+            self._update_controls()
+            self._animate_card()
 
     def _animate_card(self) -> None:
         effect = self.card.graphicsEffect()
