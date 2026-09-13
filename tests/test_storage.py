@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from deck_app.storage import StateStore, append_card, replace_card
+from deck_app.storage import StateStore, append_card, remove_card, replace_card
 
 
 class StateStoreTests(unittest.TestCase):
@@ -63,6 +63,26 @@ class StateStoreTests(unittest.TestCase):
         self.assertIn(b"\r\n\r\n", self.deck.read_bytes())
         self.assertEqual(self.store.progress(self.deck, 2), (1, 2))
         self.assertEqual(edited_cards[first.index], "updated card")
+
+    def test_removing_card_preserves_layout_and_remaps_seen_history(self):
+        self.deck.write_text("alpha\r\n\r\nbeta\r\ngamma\r\n", encoding="utf-8")
+        cards = self.store.read_cards(self.deck)
+        self.store.data["decks"][str(self.deck.resolve())] = {
+            "cards": cards,
+            "seen": [0, 1, 2],
+        }
+
+        removed = remove_card(self.deck, 1, expected="beta")
+        remaining = self.store.read_cards(self.deck)
+        self.store.record_removal(self.deck, remaining, 1)
+
+        self.assertEqual(removed, "beta")
+        self.assertEqual(remaining, ["alpha", "gamma"])
+        self.assertEqual(self.deck.read_bytes(), b"alpha\r\n\r\ngamma\r\n")
+        self.assertEqual(
+            self.store.data["decks"][str(self.deck.resolve())]["seen"],
+            [0, 1],
+        )
 
     def test_utf8_bom_and_blank_lines(self):
         self.deck.write_text("\ufeffone\n\n two \n", encoding="utf-8")

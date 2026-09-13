@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .storage import StateStore, append_card, replace_card
+from .storage import StateStore, append_card, remove_card, replace_card
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,6 +81,8 @@ class AddCardDialog(QDialog):
 
 
 class EditCardDialog(QDialog):
+    Cut = 2
+
     def __init__(self, card_text: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit card")
@@ -95,6 +97,9 @@ class EditCardDialog(QDialog):
         self.editor.selectAll()
         self.editor.setMinimumHeight(140)
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
+        self.cut_button = buttons.addButton("Cut", QDialogButtonBox.DestructiveRole)
+        self.cut_button.setToolTip("Copy this card to the clipboard and remove it from the deck")
+        self.cut_button.clicked.connect(lambda: self.done(self.Cut))
         buttons.accepted.connect(self._accept_if_valid)
         buttons.rejected.connect(self.reject)
         layout.addWidget(title)
@@ -558,7 +563,11 @@ class DeckWindow(QMainWindow):
             return
         index = self.current_card_index
         dialog = EditCardDialog(self.cards[index], self)
-        if dialog.exec() != QDialog.Accepted:
+        result = dialog.exec()
+        if result == EditCardDialog.Cut:
+            self._cut_card(index, dialog.editor.toPlainText())
+            return
+        if result != QDialog.Accepted:
             return
         try:
             edited_text = replace_card(
@@ -574,6 +583,26 @@ class DeckWindow(QMainWindow):
             self.progress_label.setText(f"{seen} of {total} seen")
         except (OSError, UnicodeError, ValueError, IndexError) as error:
             QMessageBox.critical(self, "Could not edit card", f"The card could not be saved.\n\n{error}")
+
+    def _cut_card(self, index: int, clipboard_text: str) -> None:
+        if self.current_path is None:
+            return
+        try:
+            remove_card(self.current_path, index, expected=self.cards[index])
+            self.cards = self.store.read_cards(self.current_path)
+            self.store.record_removal(self.current_path, self.cards, index)
+            QApplication.clipboard().setText(clipboard_text)
+            self.current_card_index = None
+            self._update_controls()
+            if self.cards:
+                self.card_text.setText("Card cut to the clipboard")
+                seen, total = self.store.progress(self.current_path, len(self.cards))
+                self.progress_label.setText(f"{seen} of {total} seen")
+            else:
+                self.card_text.setText("This deck is empty. Add its first card below.")
+                self.progress_label.setText("0 cards")
+        except (OSError, UnicodeError, ValueError, IndexError) as error:
+            QMessageBox.critical(self, "Could not cut card", f"The card could not be removed.\n\n{error}")
 
 
 class DeckApplication(QApplication):

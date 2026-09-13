@@ -171,6 +171,28 @@ class StateStore:
         self.data["decks"][key] = {"cards": list(cards), "seen": sorted(seen_set)}
         self.save()
 
+    def record_removal(self, path: Path, cards: Sequence[str], removed_index: int) -> None:
+        """Update a deck snapshot and shift seen indices past a removed card."""
+        key = str(path.resolve())
+        record = self.data["decks"].get(key, {})
+        old_cards = record.get("cards", [])
+        seen = record.get("seen", [])
+        expected_cards = (
+            old_cards[:removed_index] + old_cards[removed_index + 1:]
+            if isinstance(old_cards, list) and 0 <= removed_index < len(old_cards)
+            else None
+        )
+        if expected_cards == list(cards) and isinstance(seen, list):
+            seen_set = {
+                index if index < removed_index else index - 1
+                for index in seen
+                if isinstance(index, int) and 0 <= index < len(old_cards) and index != removed_index
+            }
+        else:
+            seen_set = set()
+        self.data["decks"][key] = {"cards": list(cards), "seen": sorted(seen_set)}
+        self.save()
+
 
 def append_card(path: Path, text: str) -> None:
     clean = " ".join(part.strip() for part in text.splitlines() if part.strip())
@@ -214,3 +236,27 @@ def replace_card(path: Path, index: int, text: str, expected: str | None = None)
     with path.open("w", encoding="utf-8-sig" if has_bom else "utf-8", newline="") as handle:
         handle.write("".join(lines))
     return clean
+
+
+def remove_card(path: Path, index: int, expected: str | None = None) -> str:
+    """Remove one nonblank card line while preserving all other file content."""
+    has_bom = path.read_bytes().startswith(b"\xef\xbb\xbf")
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        raw = handle.read()
+    lines = raw.splitlines(keepends=True)
+    card_lines = [
+        line_index
+        for line_index, line in enumerate(lines)
+        if line.rstrip("\r\n").strip()
+    ]
+    if not 0 <= index < len(card_lines):
+        raise IndexError("Card is no longer present in the deck")
+
+    line_index = card_lines[index]
+    old_text = lines[line_index].rstrip("\r\n")
+    if expected is not None and old_text != expected:
+        raise ValueError("The deck changed since this card was drawn")
+    del lines[line_index]
+    with path.open("w", encoding="utf-8-sig" if has_bom else "utf-8", newline="") as handle:
+        handle.write("".join(lines))
+    return old_text

@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog
 
-from deck_app.app import CardListDialog, DeckWindow
+from deck_app.app import CardListDialog, DeckWindow, EditCardDialog
 from deck_app.storage import StateStore
 
 
@@ -88,6 +88,31 @@ class ExternalOpenTests(unittest.TestCase):
 
         self.assertEqual(dialog.selected_card_index, 2)
         self.assertEqual(dialog.result(), QDialog.Accepted)
+
+    def test_edit_dialog_cut_button_returns_cut_result(self):
+        dialog = EditCardDialog("copy me")
+
+        QTest.mouseClick(dialog.cut_button, Qt.LeftButton)
+
+        self.assertEqual(dialog.result(), EditCardDialog.Cut)
+        dialog.close()
+
+    def test_cut_removes_card_and_copies_editor_contents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "cards.deck"
+            deck.write_text("first\nsecond\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(root / "data")}):
+                window = DeckWindow(deck)
+                window.current_card_index = 0
+                window._cut_card(0, "first")
+
+                self.assertEqual(deck.read_text(encoding="utf-8"), "second\n")
+                self.assertEqual(self.app.clipboard().text(), "first")
+                self.assertIsNone(window.current_card_index)
+                self.assertEqual(window.cards, ["second"])
+                window.close()
 
 
 if __name__ == "__main__":

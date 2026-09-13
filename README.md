@@ -20,7 +20,7 @@ On first launch, select the `examples` folder or any folder containing `.deck` f
 - **Next**, `Space`, or `Right Arrow`: randomly draw an unseen card.
 - **Add card** or `Ctrl+N`: append one card to the selected `.deck` file.
 - **Show List** or `Ctrl+L`: browse and search all cards; activate one to show it.
-- **Edit** or `Ctrl+E`: update the card currently in view.
+- **Edit** or `Ctrl+E`: update the card currently in view. The edit window's **Cut** button copies the card to the clipboard and removes it from the deck.
 - **Settings** or `Ctrl+,`: choose a different deck folder and switch between light and dark themes.
 
 Deck saves the selected folder, selected file, theme, and each deck's seen line numbers to `$XDG_DATA_HOME/deck/state.json` (normally `~/.local/share/deck/state.json`). State is written as soon as a card is displayed, so closing the window cannot cause that card to repeat on the next launch.
