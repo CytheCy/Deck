@@ -18,6 +18,7 @@ On first launch, select the `examples` folder or any folder containing `.deck` f
 ## Controls
 
 - **Next**, `Space`, or `Right Arrow`: randomly draw an unseen card.
+- `Down Arrow` and `Up Arrow`: move through sections of the current card separated by `|` characters. Each card starts with its first section showing.
 - **Add card** or `Ctrl+N`: append one card to the selected `.deck` file.
 - **Show List** or `Ctrl+L`: browse and search all cards; activate one to show it.
 - **Edit** or `Ctrl+E`: update the card currently in view. The edit window's **Cut** button copies the card to the clipboard and removes it from the deck.

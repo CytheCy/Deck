@@ -256,6 +256,7 @@ class DeckWindow(QMainWindow):
         self.current_path: Path | None = None
         self.cards: list[str] = []
         self.current_card_index: int | None = None
+        self.current_card_part = 0
         self.setWindowTitle("Deck")
         self.setWindowIcon(QIcon(str(APP_ICON)))
         self.setMinimumSize(620, 500)
@@ -301,22 +302,23 @@ class DeckWindow(QMainWindow):
         self.card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         card_layout = QVBoxLayout(self.card)
         card_layout.setContentsMargins(56, 48, 56, 42)
-        self.deck_label = QLabel("DECK")
-        self.deck_label.setObjectName("eyebrow")
-        self.deck_label.setAlignment(Qt.AlignCenter)
+        self.progress_label = QLabel("")
+        self.progress_label.setObjectName("progress")
+        self.progress_label.setAlignment(Qt.AlignCenter)
         self.card_text = QLabel("Choose a folder to begin")
         self.card_text.setObjectName("cardText")
         self.card_text.setWordWrap(True)
         self.card_text.setAlignment(Qt.AlignCenter)
         self.card_text.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.progress_label = QLabel("")
-        self.progress_label.setObjectName("progress")
-        self.progress_label.setAlignment(Qt.AlignCenter)
-        card_layout.addWidget(self.deck_label)
+        self.side_progress_label = QLabel("")
+        self.side_progress_label.setObjectName("progress")
+        self.side_progress_label.setAlignment(Qt.AlignCenter)
+        self.side_progress_label.hide()
+        card_layout.addWidget(self.progress_label)
         card_layout.addStretch(1)
         card_layout.addWidget(self.card_text)
         card_layout.addStretch(1)
-        card_layout.addWidget(self.progress_label)
+        card_layout.addWidget(self.side_progress_label)
         outer.addWidget(self.card, 1)
 
         footer = QFrame()
@@ -355,6 +357,8 @@ class DeckWindow(QMainWindow):
         shortcuts = (
             (QKeySequence("Space"), self.draw_card),
             (QKeySequence(Qt.Key_Right), self.draw_card),
+            (QKeySequence(Qt.Key_Down), self.show_next_card_part),
+            (QKeySequence(Qt.Key_Up), self.show_previous_card_part),
             (QKeySequence("Ctrl+N"), self.add_card),
             (QKeySequence("Ctrl+L"), self.show_card_list),
             (QKeySequence("Ctrl+E"), self.edit_card),
@@ -384,7 +388,6 @@ class DeckWindow(QMainWindow):
             QMainWindow, QWidget { background: %(window)s; color: %(text)s; }
             QLabel { background: transparent; }
             QFrame#card { background: %(surface)s; border: 1px solid %(border)s; border-radius: 22px; }
-            QLabel#eyebrow { color: #7c3aed; font-size: 11px; font-weight: 700; letter-spacing: 2px; }
             QLabel#cardText { color: %(card_text)s; font-size: 27px; font-weight: 600; }
             QLabel#progress, QLabel#muted { color: %(muted)s; font-size: 12px; }
             QLabel#dialogTitle { font-size: 19px; font-weight: 700; }
@@ -444,10 +447,12 @@ class DeckWindow(QMainWindow):
             self.current_path = None
             self.cards = []
             self.current_card_index = None
+            self.current_card_part = 0
             self.deck_combo.setPlaceholderText("No .deck files found")
             self.card_text.setText("Choose a folder with a .deck file to begin")
-            self.deck_label.setText("NO DECK SELECTED")
             self.progress_label.clear()
+            self.side_progress_label.clear()
+            self.side_progress_label.hide()
             self._update_controls()
 
     def _deck_changed(self, index: int) -> None:
@@ -483,13 +488,15 @@ class DeckWindow(QMainWindow):
             return False
         self.current_path, self.cards = path, cards
         self.current_card_index = None
+        self.current_card_part = 0
         if remember:
             self.store.set_selection(path.parent, path.name)
-        self.deck_label.setText(path.stem.upper())
         self._update_controls()
         if not cards:
             self.card_text.setText("This deck is empty. Add its first card below.")
             self.progress_label.setText("0 cards")
+            self.side_progress_label.clear()
+            self.side_progress_label.hide()
         elif draw:
             self.draw_card()
         return True
@@ -506,10 +513,10 @@ class DeckWindow(QMainWindow):
             return
         draw = self.store.draw(self.current_path, self.cards)
         self.current_card_index = draw.index
-        self.card_text.setText(draw.text)
-        seen, total = self.store.progress(self.current_path, len(self.cards))
+        self.current_card_part = 0
+        self._show_current_card_part()
         prefix = "New round · " if draw.cycle_started else ""
-        self.progress_label.setText(f"{prefix}{seen} of {total} seen")
+        self._update_card_progress(prefix)
         self._update_controls()
         self._animate_card()
 
@@ -524,9 +531,53 @@ class DeckWindow(QMainWindow):
         )
         if dialog.exec() == QDialog.Accepted and dialog.selected_card_index is not None:
             self.current_card_index = dialog.selected_card_index
-            self.card_text.setText(self.cards[self.current_card_index])
+            self.current_card_part = 0
+            self._show_current_card_part()
+            self._update_card_progress()
             self._update_controls()
             self._animate_card()
+
+    def _current_card_parts(self) -> list[str]:
+        if self.current_card_index is None:
+            return []
+        return [part.strip() for part in self.cards[self.current_card_index].split("|")]
+
+    def _show_current_card_part(self) -> None:
+        parts = self._current_card_parts()
+        if parts:
+            self.card_text.setText(parts[self.current_card_part])
+
+    def _update_card_progress(self, prefix: str = "") -> None:
+        if not self.current_path or not self.cards:
+            return
+        seen, total = self.store.progress(self.current_path, len(self.cards))
+        self.progress_label.setText(f"{prefix}{seen} of {total} seen")
+        parts = self._current_card_parts()
+        if len(parts) > 1:
+            self.side_progress_label.setText(
+                f"{self.current_card_part + 1} of {len(parts)}"
+            )
+            self.side_progress_label.show()
+        else:
+            self.side_progress_label.clear()
+            self.side_progress_label.hide()
+
+    def show_next_card_part(self) -> None:
+        parts = self._current_card_parts()
+        if self.current_card_part + 1 >= len(parts):
+            return
+        self.current_card_part += 1
+        self._show_current_card_part()
+        self._update_card_progress()
+        self._animate_card()
+
+    def show_previous_card_part(self) -> None:
+        if self.current_card_part == 0:
+            return
+        self.current_card_part -= 1
+        self._show_current_card_part()
+        self._update_card_progress()
+        self._animate_card()
 
     def _animate_card(self) -> None:
         effect = self.card.graphicsEffect()
@@ -551,8 +602,11 @@ class DeckWindow(QMainWindow):
             append_card(self.current_path, dialog.editor.toPlainText())
             self.cards = self.store.read_cards(self.current_path)
             self.current_card_index = None
+            self.current_card_part = 0
             self._update_controls()
             self.card_text.setText("Card added to the deck")
+            self.side_progress_label.clear()
+            self.side_progress_label.hide()
             seen, total = self.store.progress(self.current_path, len(self.cards))
             self.progress_label.setText(f"{seen} of {total} seen")
         except OSError as error:
@@ -570,7 +624,7 @@ class DeckWindow(QMainWindow):
         if result != QDialog.Accepted:
             return
         try:
-            edited_text = replace_card(
+            replace_card(
                 self.current_path,
                 index,
                 dialog.editor.toPlainText(),
@@ -578,9 +632,9 @@ class DeckWindow(QMainWindow):
             )
             self.cards = self.store.read_cards(self.current_path)
             self.store.record_edit(self.current_path, self.cards, index)
-            self.card_text.setText(edited_text)
-            seen, total = self.store.progress(self.current_path, len(self.cards))
-            self.progress_label.setText(f"{seen} of {total} seen")
+            self.current_card_part = 0
+            self._show_current_card_part()
+            self._update_card_progress()
         except (OSError, UnicodeError, ValueError, IndexError) as error:
             QMessageBox.critical(self, "Could not edit card", f"The card could not be saved.\n\n{error}")
 
@@ -593,6 +647,9 @@ class DeckWindow(QMainWindow):
             self.store.record_removal(self.current_path, self.cards, index)
             QApplication.clipboard().setText(clipboard_text)
             self.current_card_index = None
+            self.current_card_part = 0
+            self.side_progress_label.clear()
+            self.side_progress_label.hide()
             self._update_controls()
             if self.cards:
                 self.card_text.setText("Card cut to the clipboard")

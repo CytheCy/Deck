@@ -61,6 +61,39 @@ class ExternalOpenTests(unittest.TestCase):
                 self.app.processEvents()
 
                 self.assertEqual(window.store.progress(deck, 2), (2, 2))
+                self.assertEqual(window.progress_label.text(), "2 of 2 seen")
+                self.assertEqual(window.side_progress_label.text(), "")
+                window.close()
+
+    def test_up_and_down_arrows_navigate_card_parts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "cards.deck"
+            deck.write_text("front | middle | back\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(root / "data")}):
+                window = DeckWindow(deck)
+                window.show()
+                window.activateWindow()
+                self.app.processEvents()
+
+                self.assertEqual(window.card_text.text(), "front")
+                self.assertEqual(window.progress_label.text(), "1 of 1 seen")
+                self.assertEqual(window.side_progress_label.text(), "1 of 3")
+                QTest.keyClick(window, Qt.Key_Down)
+                self.assertEqual(window.card_text.text(), "middle")
+                self.assertEqual(window.progress_label.text(), "1 of 1 seen")
+                self.assertEqual(window.side_progress_label.text(), "2 of 3")
+                QTest.keyClick(window, Qt.Key_Down)
+                QTest.keyClick(window, Qt.Key_Down)
+                self.assertEqual(window.card_text.text(), "back")
+                self.assertEqual(window.progress_label.text(), "1 of 1 seen")
+                self.assertEqual(window.side_progress_label.text(), "3 of 3")
+                QTest.keyClick(window, Qt.Key_Up)
+                self.assertEqual(window.card_text.text(), "middle")
+                QTest.keyClick(window, Qt.Key_Up)
+                QTest.keyClick(window, Qt.Key_Up)
+                self.assertEqual(window.card_text.text(), "front")
                 window.close()
 
     def test_card_list_search_filters_case_insensitively(self):
