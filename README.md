@@ -36,6 +36,7 @@ After activating the virtual environment, install the package and desktop entry:
 pip install .
 install -Dm644 packaging/io.github.deck.Deck.desktop "$HOME/.local/share/applications/io.github.deck.Deck.desktop"
 install -Dm644 assets/io.github.deck.Deck.svg "$HOME/.local/share/icons/hicolor/scalable/apps/io.github.deck.Deck.svg"
+install -Dm644 assets/application-x-deck.svg "$HOME/.local/share/icons/hicolor/scalable/mimetypes/application-x-deck.svg"
 install -Dm644 packaging/io.github.deck.Deck.xml "$HOME/.local/share/mime/packages/io.github.deck.Deck.xml"
 gtk-update-icon-cache "$HOME/.local/share/icons/hicolor"
 update-mime-database "$HOME/.local/share/mime"
@@ -45,6 +46,22 @@ update-desktop-database "$HOME/.local/share/applications"
 The `deck` command will then be available while that Python environment is active. For a permanent launcher, use a tool such as `pipx install .` and ensure `~/.local/bin` is on your `PATH`.
 
 After installation, `.deck` files appear with Deck in the file manager's **Open With** menu. Opening one this way uses that file for the current app session only; launching Deck normally still opens the saved deck folder and selected file from Settings.
+
+## Build and install a Fedora RPM
+
+Install the build tools and dependencies, then build from this checkout:
+
+```bash
+sudo dnf install rpm-build python3-build python3-devel python3-setuptools pyproject-rpm-macros python3-pyside6 desktop-file-utils
+python3 -m build --sdist
+mkdir -p "$HOME/rpmbuild/SOURCES" "$HOME/rpmbuild/SPECS"
+cp dist/random_deck-1.0.0.tar.gz "$HOME/rpmbuild/SOURCES/"
+cp packaging/random-deck.spec "$HOME/rpmbuild/SPECS/"
+rpmbuild -ba "$HOME/rpmbuild/SPECS/random-deck.spec"
+sudo dnf install "$HOME/rpmbuild/RPMS/noarch/random-deck-1.0.0-1"*.noarch.rpm
+```
+
+The RPM installs the Deck launcher, the supplied icon, and a matching icon for `.deck` files. KDE's application menu and Dolphin use these system-wide files. The desktop entry also makes Deck available in **Open With** for `.deck` files; set it as the default application in Dolphin if desired.
 
 ## Tests
 

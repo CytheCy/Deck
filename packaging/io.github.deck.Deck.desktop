@@ -1,10 +1,13 @@
 [Desktop Entry]
 Type=Application
 Name=Deck
+GenericName=Index Card Viewer
 Comment=Draw unseen cards at random from .deck files
 Exec=deck %f
 Icon=io.github.deck.Deck
 Terminal=false
-Categories=Utility;Education;
+Categories=Utility;
+Keywords=deck;cards;index cards;
+StartupNotify=true
 StartupWMClass=io.github.deck.Deck
 MimeType=application/x-deck;

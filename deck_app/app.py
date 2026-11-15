@@ -97,7 +97,7 @@ class EditCardDialog(QDialog):
         self.editor.selectAll()
         self.editor.setMinimumHeight(140)
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
-        self.cut_button = buttons.addButton("Cut", QDialogButtonBox.DestructiveRole)
+        self.cut_button = buttons.addButton("Delete", QDialogButtonBox.DestructiveRole)
         self.cut_button.setToolTip("Copy this card to the clipboard and remove it from the deck")
         self.cut_button.clicked.connect(lambda: self.done(self.Cut))
         buttons.accepted.connect(self._accept_if_valid)
