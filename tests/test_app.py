@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog
 
-from deck_app.app import CardListDialog, DeckWindow, EditCardDialog
+from deck_app.app import CardListDialog, DeckWindow, EditCardDialog, SettingsDialog, THEMES
 from deck_app.storage import StateStore
 
 
@@ -129,6 +129,22 @@ class ExternalOpenTests(unittest.TestCase):
 
         self.assertEqual(dialog.result(), EditCardDialog.Cut)
         dialog.close()
+
+    def test_settings_theme_choices_apply_and_save_immediately(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(Path(temporary) / "data")}):
+                window = DeckWindow()
+                dialog = SettingsDialog(None, window.store.theme, window._settings_changed, window)
+                self.assertEqual(set(dialog.theme_buttons), set(THEMES))
+                dialog.theme_buttons["catppuccin"].setChecked(True)
+                self.app.processEvents()
+                self.assertEqual(window.store.theme, "catppuccin")
+                self.assertEqual(StateStore().theme, "catppuccin")
+                self.assertIn("#1e1e2e", window.styleSheet())
+                dialog.theme_buttons["tokyo"].setChecked(True)
+                self.assertEqual(StateStore().theme, "tokyo")
+                dialog.close()
+                window.close()
 
     def test_cut_removes_card_and_copies_editor_contents(self):
         with tempfile.TemporaryDirectory() as temporary:

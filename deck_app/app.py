@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QPlainTextEdit,
+    QRadioButton,
+    QScrollArea,
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
@@ -28,6 +30,57 @@ from PySide6.QtWidgets import (
 )
 
 from .storage import StateStore, append_card, remove_card, replace_card
+
+
+THEMES = {
+    "catppuccin": {
+        "name": "Catppuccin Mocha", "description": "Soft lavender · calm and elegant",
+        "window": "#1e1e2e", "text": "#cdd6f4", "surface": "#181825",
+        "border": "#45475a", "muted": "#a6adc8", "field": "#313244",
+        "hover": "#45475a", "card_text": "#cdd6f4", "menu_selection": "#45475a",
+        "accent": "#cba6f7", "accent_hover": "#b4befe", "accent_text": "#1e1e2e",
+    },
+    "tokyo": {
+        "name": "Tokyo Night", "description": "Midnight blue · crisp and focused",
+        "window": "#1a1b26", "text": "#c0caf5", "surface": "#16161e",
+        "border": "#414868", "muted": "#a9b1d6", "field": "#24283b",
+        "hover": "#292e42", "card_text": "#c0caf5", "menu_selection": "#364a82",
+        "accent": "#7aa2f7", "accent_hover": "#89b4fa", "accent_text": "#16161e",
+    },
+    "everforest": {
+        "name": "Everforest Dark", "description": "Warm forest · a literary atmosphere",
+        "window": "#232a2e", "text": "#d3c6aa", "surface": "#2d353b",
+        "border": "#475258", "muted": "#9da9a0", "field": "#343f44",
+        "hover": "#3d484d", "card_text": "#d3c6aa", "menu_selection": "#46534a",
+        "accent": "#a7c080", "accent_hover": "#b5cc91", "accent_text": "#232a2e",
+    },
+    "system": {
+        "name": "System", "description": "Follow the desktop appearance at launch",
+        "accent": "#7aa2f7",
+    },
+}
+
+
+def theme_colors(theme: str) -> dict[str, str]:
+    if theme != "system":
+        return THEMES[theme]
+    palette = QApplication.instance().palette()
+    dark = palette.window().color().lightness() < 128
+    colors = {
+        "window": "#20252b" if dark else "#eef1f7",
+        "text": "#f0f2f5" if dark else "#17213a",
+        "surface": "#171b20" if dark else "#ffffff",
+        "border": "#3b444e" if dark else "#dfe4ee",
+        "muted": "#abb4bf" if dark else "#64748b",
+        "field": "#2d343c" if dark else "#f6f7fb",
+        "hover": "#384454" if dark else "#e6efff",
+        "card_text": "#f0f2f5" if dark else "#17213a",
+        "menu_selection": "#384454" if dark else "#dbeafe",
+        "accent": "#7aa2f7" if dark else "#526fd4",
+        "accent_hover": "#89b4fa" if dark else "#405dc4",
+        "accent_text": "#171b20" if dark else "#ffffff",
+    }
+    return colors
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -194,11 +247,14 @@ class CardListDialog(QDialog):
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, folder: Path | None, theme: str, parent: QWidget | None = None) -> None:
+    def __init__(self, folder: Path | None, theme: str, on_change=None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.selected_folder = folder
+        self.selected_theme = theme
+        self.on_change = on_change
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(520)
+        self.resize(560, 820)
         layout = QVBoxLayout(self)
         title = QLabel("Settings")
         title.setObjectName("dialogTitle")
@@ -215,29 +271,60 @@ class SettingsDialog(QDialog):
         folder_row.addWidget(self.folder_edit, 1)
         folder_row.addWidget(browse_button)
 
-        theme_label = QLabel("Appearance")
+        theme_label = QLabel("Theme")
         theme_label.setObjectName("fieldLabel")
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItem("Light", "light")
-        self.theme_combo.addItem("Dark", "dark")
-        self.theme_combo.setCurrentIndex(max(0, self.theme_combo.findData(theme)))
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        theme_scroll = QScrollArea()
+        theme_scroll.setObjectName("themeScroll")
+        theme_scroll.setWidgetResizable(True)
+        theme_scroll.setFrameShape(QFrame.NoFrame)
+        theme_body = QWidget()
+        theme_layout = QVBoxLayout(theme_body)
+        theme_layout.setContentsMargins(0, 0, 8, 0)
+        theme_layout.setSpacing(14)
+        self.theme_buttons = {}
+        for key, info in THEMES.items():
+            radio = QRadioButton(info["name"])
+            radio.setChecked(key == theme)
+            self.theme_buttons[key] = radio
+            theme_layout.addWidget(radio)
+            preview_colors = theme_colors(key)
+            preview = QLabel("<b># A quiet place to write</b><br>The next chapter begins here…")
+            preview.setObjectName("themePreview")
+            preview.setStyleSheet(
+                "QLabel#themePreview { background: %s; color: %s; border-left: 5px solid %s; "
+                "padding: 12px 15px; font-size: 14px; }" % (
+                    preview_colors["surface"], preview_colors["card_text"], preview_colors["accent"]
+                )
+            )
+            theme_layout.addWidget(preview)
+            description = QLabel(info["description"])
+            description.setObjectName("muted")
+            theme_layout.addWidget(description)
+            radio.toggled.connect(lambda checked, selected=key: self._select_theme(selected) if checked else None)
+        theme_layout.addStretch()
+        theme_scroll.setWidget(theme_body)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(self.accept)
         layout.addWidget(title)
         layout.addSpacing(8)
         layout.addWidget(folder_label)
         layout.addLayout(folder_row)
         layout.addSpacing(8)
         layout.addWidget(theme_label)
-        layout.addWidget(self.theme_combo)
-        layout.addSpacing(12)
+        layout.addWidget(theme_scroll, 1)
+        hint = QLabel("Changes apply immediately and are saved automatically.")
+        hint.setObjectName("muted")
+        layout.addWidget(hint)
         layout.addWidget(buttons)
 
     @property
     def theme(self) -> str:
-        return str(self.theme_combo.currentData())
+        return self.selected_theme
+
+    def _select_theme(self, theme: str) -> None:
+        self.selected_theme = theme
+        if self.on_change:
+            self.on_change(self.selected_folder, theme)
 
     def _choose_folder(self) -> None:
         start = str(self.selected_folder or Path.home())
@@ -247,6 +334,8 @@ class SettingsDialog(QDialog):
         if selected:
             self.selected_folder = Path(selected)
             self.folder_edit.setText(selected)
+            if self.on_change:
+                self.on_change(self.selected_folder, self.selected_theme)
 
 
 class DeckWindow(QMainWindow):
@@ -276,7 +365,7 @@ class DeckWindow(QMainWindow):
         painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
         painter.fillRect(
             pixmap.rect(),
-            QColor(color or ("#e9e7f2" if self.store.theme == "dark" else "#17213a")),
+            QColor(color or theme_colors(self.store.theme)["text"]),
         )
         painter.end()
         return QIcon(pixmap)
@@ -342,7 +431,7 @@ class DeckWindow(QMainWindow):
             "bx-shuffle", "Next", "Draw a random unseen card (Space or Right Arrow)"
         )
         self.next_button.setObjectName("primaryTool")
-        self.next_button.setIcon(self._icon("bx-shuffle", "#ffffff"))
+        self.next_button.setIcon(self._icon("bx-shuffle", theme_colors(self.store.theme)["accent_text"]))
         self.next_button.clicked.connect(self.draw_card)
         footer_layout.addWidget(self.settings_button)
         footer_layout.addWidget(self.deck_combo, 1)
@@ -372,18 +461,7 @@ class DeckWindow(QMainWindow):
 
     def _apply_style(self) -> None:
         QApplication.instance().setFont(QFont("Noto Sans", 10))
-        if self.store.theme == "dark":
-            colors = {
-                "window": "#11131a", "text": "#ececf3", "surface": "#1b1e28",
-                "border": "#303543", "muted": "#9ba4b7", "field": "#242836",
-                "hover": "#30284a", "card_text": "#f4f2f8", "menu_selection": "#3a2c5f",
-            }
-        else:
-            colors = {
-                "window": "#eef1f7", "text": "#17213a", "surface": "#ffffff",
-                "border": "#dfe4ee", "muted": "#7c879f", "field": "#f6f7fb",
-                "hover": "#f0ecff", "card_text": "#17213a", "menu_selection": "#ede9fe",
-            }
+        colors = theme_colors(self.store.theme)
         self.setStyleSheet("""
             QMainWindow, QWidget { background: %(window)s; color: %(text)s; }
             QLabel { background: transparent; }
@@ -394,41 +472,46 @@ class DeckWindow(QMainWindow):
             QLabel#fieldLabel { color: %(muted)s; font-size: 12px; font-weight: 600; }
             QFrame#footer { background: %(surface)s; border: 1px solid %(border)s; border-radius: 15px; }
             QToolButton { background: transparent; border: none; border-radius: 9px; padding: 9px 11px; font-weight: 600; }
-            QToolButton:hover { background: %(hover)s; color: #a78bfa; }
-            QToolButton:disabled { color: #aab1bf; }
-            QToolButton#primaryTool { background: #7c3aed; color: white; padding: 10px 14px; }
-            QToolButton#primaryTool:hover { background: #6d28d9; }
+            QToolButton:hover { background: %(hover)s; color: %(accent)s; }
+            QToolButton:disabled { color: %(muted)s; }
+            QToolButton#primaryTool { background: %(accent)s; color: %(accent_text)s; padding: 10px 14px; }
+            QToolButton#primaryTool:hover { background: %(accent_hover)s; }
             QComboBox, QLineEdit { background: %(field)s; border: 1px solid %(border)s; border-radius: 9px; padding: 9px 12px; color: %(text)s; }
-            QComboBox:hover, QComboBox:focus { border-color: #8b5cf6; }
+            QComboBox:hover, QComboBox:focus { border-color: %(accent)s; }
             QComboBox QAbstractItemView { background: %(surface)s; selection-background-color: %(menu_selection)s; color: %(text)s; }
             QListWidget#cardList { background: %(surface)s; alternate-background-color: %(field)s; border: 1px solid %(border)s; border-radius: 9px; padding: 5px; color: %(text)s; outline: none; }
             QListWidget#cardList::item { border-radius: 6px; padding: 10px 12px; }
             QListWidget#cardList::item:alternate { background: %(field)s; }
             QListWidget#cardList::item:selected { background: %(menu_selection)s; color: %(text)s; }
             QListWidget#cardList::item:hover { background: %(hover)s; }
-            QLineEdit#cardSearch:focus { border-color: #8b5cf6; }
+            QLineEdit#cardSearch:focus { border-color: %(accent)s; }
             QPlainTextEdit { background: %(surface)s; border: 1px solid %(border)s; border-radius: 9px; padding: 10px; font-size: 14px; color: %(text)s; }
-            QPlainTextEdit:focus { border-color: #8b5cf6; }
+            QPlainTextEdit:focus { border-color: %(accent)s; }
             QPushButton { background: %(field)s; border: 1px solid %(border)s; padding: 8px 16px; border-radius: 7px; color: %(text)s; }
-            QPushButton:hover { border-color: #8b5cf6; }
+            QPushButton:hover { border-color: %(accent)s; }
+            QRadioButton { spacing: 9px; font-size: 14px; }
+            QRadioButton::indicator { width: 16px; height: 16px; }
+            QScrollArea#themeScroll, QScrollArea#themeScroll > QWidget > QWidget { background: %(window)s; border: none; }
         """ % colors)
 
     def open_settings(self) -> None:
+        dialog = SettingsDialog(self.store.folder, self.store.theme, self._settings_changed, self)
+        dialog.exec()
+
+    def _settings_changed(self, folder: Path | None, theme: str) -> None:
         old_folder = self.store.folder
-        dialog = SettingsDialog(old_folder, self.store.theme, self)
-        if dialog.exec() == QDialog.Accepted:
-            self.store.set_preferences(dialog.selected_folder, dialog.theme)
-            self._apply_style()
-            self._refresh_icons()
-            if dialog.selected_folder != old_folder:
-                self.refresh_decks(initial=False)
+        self.store.set_preferences(folder, theme)
+        self._apply_style()
+        self._refresh_icons()
+        if folder != old_folder:
+            self.refresh_decks(initial=False)
 
     def _refresh_icons(self) -> None:
         self.settings_button.setIcon(self._icon("bx-cog"))
         self.add_button.setIcon(self._icon("bx-plus"))
         self.list_button.setIcon(self._icon("bx-list-ul"))
         self.edit_button.setIcon(self._icon("bx-edit"))
-        self.next_button.setIcon(self._icon("bx-shuffle", "#ffffff"))
+        self.next_button.setIcon(self._icon("bx-shuffle", theme_colors(self.store.theme)["accent_text"]))
 
     def refresh_decks(self, initial: bool = False, preferred: str = "") -> None:
         decks = self.store.list_decks(self.store.folder)

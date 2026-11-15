@@ -97,14 +97,20 @@ class StateStoreTests(unittest.TestCase):
         )
 
     def test_theme_preference_survives_reload(self):
-        self.store.set_preferences(self.root, "dark")
+        self.store.set_preferences(self.root, "tokyo")
         reloaded = StateStore(self.root / "data")
-        self.assertEqual(reloaded.theme, "dark")
+        self.assertEqual(reloaded.theme, "tokyo")
         self.assertEqual(reloaded.folder, self.root)
 
-    def test_invalid_saved_theme_falls_back_to_light(self):
+    def test_invalid_saved_theme_falls_back_to_system(self):
         self.store.data["theme"] = "sepia"
-        self.assertEqual(self.store.theme, "light")
+        self.assertEqual(self.store.theme, "system")
+
+    def test_legacy_theme_values_are_mapped(self):
+        self.store.data["theme"] = "dark"
+        self.assertEqual(self.store.theme, "everforest")
+        self.store.data["theme"] = "light"
+        self.assertEqual(self.store.theme, "system")
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ class StateStore:
             "version": 1,
             "folder": "",
             "active_file": "",
-            "theme": "light",
+            "theme": "system",
             "decks": {},
         }
         self._load()
@@ -79,8 +79,10 @@ class StateStore:
 
     @property
     def theme(self) -> str:
-        value = self.data.get("theme", "light")
-        return value if value in ("light", "dark") else "light"
+        value = self.data.get("theme", "system")
+        # Existing installations used the light/dark values.
+        value = {"light": "system", "dark": "everforest"}.get(value, value)
+        return value if value in ("catppuccin", "tokyo", "everforest", "system") else "system"
 
     def set_selection(self, folder: Path, active_file: str = "") -> None:
         self.data["folder"] = str(folder.resolve())
@@ -88,7 +90,7 @@ class StateStore:
         self.save()
 
     def set_preferences(self, folder: Path | None, theme: str) -> None:
-        if theme not in ("light", "dark"):
+        if theme not in ("catppuccin", "tokyo", "everforest", "system"):
             raise ValueError(f"Unsupported theme: {theme}")
         self.data["folder"] = str(folder.resolve()) if folder else ""
         self.data["theme"] = theme
