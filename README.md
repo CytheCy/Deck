@@ -49,6 +49,11 @@ After installation, `.deck` files appear with Deck in the file manager's **Open 
 
 ## Build and install a Fedora RPM
 
+Pushing a `v1.0.0` tag to GitHub runs the Fedora 44 RPM build and its tests. When
+the workflow succeeds, the RPM is attached to the `v1.0.0` GitHub Release.
+Download that RPM from the repository's Releases page and install it with
+`sudo dnf install ./random-deck-1.0.0-1.fc44.noarch.rpm`.
+
 Install the build tools and dependencies, then build from this checkout:
 
 ```bash

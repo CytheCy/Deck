@@ -1,0 +1,55 @@
+name: Release Fedora RPM
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  rpm:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: >-
+          dnf install -y
+          rpm-build python3-build python3-devel python3-setuptools python3-wheel
+          pyproject-rpm-macros python3-pyside6 desktop-file-utils
+          gh
+
+      - name: Check release version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import tomllib
+
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          spec = pathlib.Path('packaging/random-deck.spec').read_text()
+          spec_version = re.search(r'^Version:\s*(\S+)', spec, re.MULTILINE).group(1)
+          tag = os.environ['GITHUB_REF_NAME']
+          assert tag == f'v{version}' == f'v{spec_version}', (tag, version, spec_version)
+          PY
+
+      - name: Build RPM and run package checks
+        shell: bash
+        run: |
+          python3 -m build --sdist --no-isolation
+          mkdir -p rpmbuild/SOURCES rpmbuild/BUILD rpmbuild/BUILDROOT rpmbuild/RPMS rpmbuild/SRPMS
+          cp "dist/random_deck-${GITHUB_REF_NAME#v}.tar.gz" rpmbuild/SOURCES/
+          rpmbuild -ba --define "_topdir ${PWD}/rpmbuild" packaging/random-deck.spec
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" rpmbuild/RPMS/noarch/*.rpm \
+            --verify-tag --title "Deck $GITHUB_REF_NAME" --generate-notes

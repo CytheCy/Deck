@@ -20,6 +20,9 @@ Deck draws cards from plain-text .deck files without repeating a card until
 every card has appeared. The package includes a KDE launcher and file type
 association.
 
+%prep
+%autosetup -n random_deck-%{version}
+
 %generate_buildrequires
 %pyproject_buildrequires
 
@@ -29,10 +32,11 @@ association.
 %install
 %pyproject_install
 %pyproject_save_files deck_app
+rm %{buildroot}%{_datadir}/deck/assets/icons/LICENSE
 
 %check
 desktop-file-validate packaging/io.github.deck.Deck.desktop
-QT_QPA_PLATFORM=offscreen %{python3} -m unittest discover -v
+QT_QPA_PLATFORM=offscreen %{python3} -m unittest discover -s tests -v
 
 %files -f %{pyproject_files}
 %doc README.md
