@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:44
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install build tools
         run: >-
@@ -46,10 +46,19 @@ jobs:
           cp "dist/random_deck-${GITHUB_REF_NAME#v}.tar.gz" rpmbuild/SOURCES/
           rpmbuild -ba --define "_topdir ${PWD}/rpmbuild" packaging/random-deck.spec
 
+      - name: Save RPM build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: deck-${{ github.ref_name }}-rpm
+          path: rpmbuild/RPMS/noarch/*.rpm
+          if-no-files-found: error
+
       - name: Publish GitHub release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create "$GITHUB_REF_NAME" rpmbuild/RPMS/noarch/*.rpm \
-            --verify-tag --title "Deck $GITHUB_REF_NAME" --generate-notes
+            --verify-tag --title "Deck $GITHUB_REF_NAME" \
+            --notes "Fedora 44 RPM for Deck $GITHUB_REF_NAME."
